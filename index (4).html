@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medico - Professional Health Assistant</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <style>
+        body { display: flex; font-family: Arial, sans-serif; background-color: #f8f9fa; margin: 0; color: #333; }
+        .sidebar { width: 250px; background-color: #004080; color: white; height: 100vh; padding: 20px; display: flex; flex-direction: column; }
+        .sidebar h2 { text-align: center; color: #ffffff; margin-bottom: 20px; }
+        .sidebar .nav-item { padding: 10px; color: white; text-decoration: none; font-size: 1.1em; cursor: pointer; border-bottom: 1px solid #ddd; margin-bottom: 10px; }
+        .sidebar .nav-item:hover { background-color: #00509e; }
+        .main-content { flex: 1; padding: 20px; background-color: #fff; overflow-y: auto; }
+        .info-box, .map, .calendar, .chatbot-container, .appointment-container { margin: 20px 0; padding: 15px; background-color: #e9f5ff; border-radius: 8px; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); }
+        h3 { color: #00509e; font-size: 1.2em; }
+        #map { height: 300px; margin-top: 15px; }
+        .diagnosis-results, .appointment-results, #weather { margin-top: 10px; padding: 10px; background: #f1f8ff; border-radius: 8px; }
+        #symptoms, #chat-input, #appointment-doctor, #appointment-specialization, #appointment-time { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
+        .button { background-color: #004080; color: white; padding: 8px 12px; border: none; border-radius: 5px; margin-top: 10px; cursor: pointer; }
+        .button:hover { background-color: #00509e; }
+        .weather-forecast { display: flex; justify-content: space-between; }
+        .weather-day { flex: 1; text-align: center; padding: 10px; border-radius: 5px; background-color: #cce7ff; margin: 5px; }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h2>Medico</h2>
+        <div class="nav-item" onclick="toggleSection('symptom-section')"><i class="fas fa-stethoscope"></i> Symptom Checker</div>
+        <div class="nav-item" onclick="toggleSection('appointment-section')"><i class="fas fa-calendar-alt"></i> Appointments</div>
+        <div class="nav-item" onclick="toggleSection('weather-section')"><i class="fas fa-cloud-sun"></i> Weather</div>
+        <div class="nav-item" onclick="toggleSection('map-section')"><i class="fas fa-map-marked-alt"></i> Location Map</div>
+        <div class="nav-item" onclick="toggleSection('chat-section')"><i class="fas fa-comments"></i> Chatbot</div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Symptom Checker Section -->
+        <div class="info-box" id="symptom-section">
+            <h3>Symptom Checker</h3>
+            <textarea id="symptoms" rows="3" placeholder="Enter your symptoms here..."></textarea>
+            <button class="button" onclick="detectDisease()">Check Disease</button>
+            <div class="diagnosis-results" id="diagnosis-results"></div>
+        </div>
+
+        <!-- Appointments Section -->
+        <div class="appointment-container" id="appointment-section" style="display: none;">
+            <h3>Book an Appointment</h3>
+            <select id="appointment-doctor">
+                <option>Select Doctor</option>
+                <option>Dr. Smith - Cardiologist</option>
+                <option>Dr. Emma - Dermatologist</option>
+                <option>Dr. Liam - Neurologist</option>
+            </select>
+            <select id="appointment-specialization">
+                <option>Select Specialization</option>
+                <option>Cardiology</option>
+                <option>Dermatology</option>
+                <option>Neurology</option>
+            </select>
+            <input type="date" id="appointment-date">
+            <select id="appointment-time">
+                <option>Select Time Slot</option>
+                <option>10:00 AM - 11:00 AM</option>
+                <option>2:00 PM - 3:00 PM</option>
+                <option>4:00 PM - 5:00 PM</option>
+            </select>
+            <button class="button" onclick="bookAppointment()">Book Appointment</button>
+            <div class="appointment-results" id="appointment-results"></div>
+        </div>
+
+        <!-- Weather Section -->
+        <div class="info-box" id="weather-section" style="display: none;">
+            <h3>Weather</h3>
+            <div id="weather">Loading weather...</div>
+            <div class="weather-forecast" id="forecast"></div>
+        </div>
+
+        <!-- Map Section -->
+        <div class="map" id="map-section" style="display: none;">
+            <h3>Location Map</h3>
+            <input type="text" id="location-search" placeholder="Search location...">
+            <button class="button" onclick="searchLocation()">Search</button>
+            <div id="map"></div>
+        </div>
+
+        <!-- Chatbot Section -->
+        <div class="chatbot-container" id="chat-section" style="display: none;">
+            <h3>Chatbot</h3>
+            <div id="chat-output"></div>
+            <input type="text" id="chat-input" placeholder="Ask a question">
+            <button class="button" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+     <script>
+        // Expanded Disease Database with medications
+        const diseasesData = [
+            { name: "Common Cold", symptoms: ["cough","cold","runny nose", "sneezing"], medications: ["Antihistamines", "Cough Syrup"] },
+            { name: "Flu", symptoms: ["fever", "chills", "body aches"], medications: ["Antivirals"] },
+            { name: "Migraine", symptoms: ["headache", "nausea"], medications: ["Painkillers", "Anti-nausea medication"] },
+            { name: "Diabetes", symptoms: ["thirst", "frequent urination", "blurred vision"], medications: ["Insulin", "Metformin"] },
+            { name: "Asthma", symptoms: ["wheezing", "shortness of breath", "cough"], medications: ["Inhalers", "Steroids"] },
+            { name: "Hypertension", symptoms: ["headache", "dizziness"], medications: ["ACE Inhibitors", "Beta Blockers"] },
+            { name: "Arthritis", symptoms: ["joint pain","back pain","stiffness"], medications: ["NSAIDs", "Corticosteroids"] },
+            { name: "Anemia", symptoms: ["fatigue", "pale skin"], medications: ["Iron Supplements", "Vitamin B12"] },
+            { name: "Bronchitis", symptoms: ["cough", "mucus"], medications: ["Cough Syrup", "Antibiotics (if bacterial)"] },
+            { name: "Tuberculosis", symptoms: ["persistent cough", "fever", "night sweats"], medications: ["Antituberculosis Drugs"] },
+            { name: "Pneumonia", symptoms: ["chest pain", "cough", "fever"], medications: ["Antibiotics", "Pain Relievers"] },
+            { name: "Hyperthyroidism", symptoms: ["weight loss", "rapid heartbeat"], medications: ["Antithyroid Medication"] },
+            { name: "Hypothyroidism", symptoms: ["weight gain", "fatigue"], medications: ["Thyroid Hormone"] },
+            { name: "Allergy", symptoms: ["sneezing", "itching", "rash"], medications: ["Antihistamines", "Steroids"] },
+            { name: "GERD", symptoms: ["heartburn", "acid reflux"], medications: ["Antacids", "Proton Pump Inhibitors"] },
+            { name: "COVID-19", symptoms: ["fever", "cough", "loss of taste/smell"], medications: ["Antivirals", "Supportive Care"] },
+            { name: "UTI", symptoms: ["painful urination", "frequent urge"], medications: ["Antibiotics"] },
+            { name: "Anxiety", symptoms: ["nervousness", "palpitations"], medications: ["Anxiolytics", "Therapy"] },
+            { name: "Depression", symptoms: ["sadness", "fatigue"], medications: ["Antidepressants", "Therapy"] },
+            { name: "Conjunctivitis", symptoms: ["red eyes", "itching"], medications: ["Eye Drops", "Antibiotics (if bacterial)"] }
+            // Additional diseases...
+        ];
+
+        function toggleSection(sectionId) {
+            document.querySelectorAll('.main-content > div').forEach(section => section.style.display = 'none');
+            document.getElementById(sectionId).style.display = 'block';
+        }
+
+        // Appointment Functionality
+        function bookAppointment() {
+            const doctor = document.getElementById('appointment-doctor').value;
+            const specialization = document.getElementById('appointment-specialization').value;
+            const date = document.getElementById('appointment-date').value;
+            const time = document.getElementById('appointment-time').value;
+            document.getElementById('appointment-results').innerHTML = `
+                Appointment confirmed with ${doctor} in ${specialization} on ${date} at ${time}.
+            `;
+        }
+
+        // Fetch Weather and Forecast
+        async function fetchWeather(city) {
+            const apiKey = 'cb669b0e7977e5085210c5309da7b642';
+            const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`);
+            const data = await response.json();
+            document.getElementById('weather').innerHTML = `
+                <p>Temperature: ${data.main.temp}°C</p>
+                <p><img src="https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png"> ${data.weather[0].description}</p>
+            `;
+            // Display 3-day forecast
+            const forecast = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric`);
+            const forecastData = await forecast.json();
+            document.getElementById('forecast').innerHTML = forecastData.list.slice(0, 3).map(item => `
+                <div class="weather-day">
+                    <p>${new Date(item.dt_txt).toLocaleDateString()}</p>
+                    <p><img src="https://openweathermap.org/img/wn/${item.weather[0].icon}.png"> ${item.weather[0].description}</p>
+                    <p>${item.main.temp}°C</p>
+                </div>
+            `).join('');
+        }
+
+        // Map Initialization with Location Search
+        const map = L.map('map').setView([51.505, -0.09], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+        const marker = L.marker([51.505, -0.09], { draggable: true }).addTo(map);
+
+        function searchLocation() {
+            const query = document.getElementById('location-search').value;
+            fetch(`https://api.opencagedata.com/geocode/v1/json?q=${query}&key=YOUR_OPENCAGE_API_KEY`)
+                .then(response => response.json())
+                .then(data => {
+                    const { lat, lng } = data.results[0].geometry;
+                    map.setView([lat, lng], 13);
+                    marker.setLatLng([lat, lng]);
+                });
+        }
+
+        // Chatbot functionality remains the same as in the previous response
+        function detectDisease() {
+            const symptoms = document.getElementById('symptoms').value.toLowerCase();
+            let response = "I couldn't detect any specific disease. Please provide more symptoms.";
+
+            diseasesData.forEach(disease => {
+                if (disease.symptoms.some(symptom => symptoms.includes(symptom))) {
+                    response = `It sounds like ${disease.name}. Suggested medications include: ${disease.medications.join(", ")}.`;
+                }
+            });
+
+            document.getElementById('diagnosis-results').innerHTML = `<p>${response}</p>`;
+        }
+
+        function sendMessage() {
+            const chatInput = document.getElementById('chat-input').value.toLowerCase();
+            let response = "I'm here to help! Please describe your symptoms or ask about a specific disease.";
+
+            diseasesData.forEach(disease => {
+                if (chatInput.includes(disease.name.toLowerCase()) || disease.symptoms.some(symptom => chatInput.includes(symptom))) {
+                    response = `It sounds like ${disease.name}. Suggested medications include: ${disease.medications.join(", ")}.`;
+                }
+            });
+
+            document.getElementById('chat-output').innerHTML += `<p><strong>Bot:</strong> ${response}</p>`;
+        }
+
+        // Trigger fetchWeather with a default city for testing
+        fetchWeather('London'); // Replace 'London' with dynamic city for user's location
+    </script>
+</body>
+</html>
